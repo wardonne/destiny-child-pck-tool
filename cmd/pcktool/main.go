@@ -7,7 +7,7 @@ import (
 	"github.com/gopi-frame/collection/list"
 	"github.com/gopi-frame/console"
 	"github.com/spf13/cobra"
-	"github.com/wardonne/distiny-child-pck-tool"
+	"github.com/wardonne/destiny-child-pck-tool"
 	"os"
 	"path/filepath"
 	"runtime/debug"

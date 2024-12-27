@@ -3,7 +3,7 @@ package pcktool
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/wardonne/distiny-child-pck-tool/object"
+	"github.com/wardonne/destiny-child-pck-tool/object"
 	"path/filepath"
 )
 

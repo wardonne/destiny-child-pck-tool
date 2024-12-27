@@ -1,4 +1,4 @@
-module github.com/wardonne/distiny-child-pck-tool
+module github.com/wardonne/destiny-child-pck-tool
 
 go 1.23
 

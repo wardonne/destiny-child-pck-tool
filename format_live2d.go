@@ -3,8 +3,8 @@ package pcktool
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/wardonne/distiny-child-pck-tool/object"
 	"path/filepath"
-	"pcktool/object"
 )
 
 func GenerateLive2D(pck *object.Package) (*object.Live2DModel, error) {

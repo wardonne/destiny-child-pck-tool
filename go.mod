@@ -1,4 +1,4 @@
-module pcktool
+module github.com/wardonne/distiny-child-pck-tool
 
 go 1.23
 

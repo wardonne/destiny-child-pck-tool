@@ -56,14 +56,14 @@ This package also provides a simple command line tool for unpacking Pck files.
 
 ```shell
 # install the tool
-go install "github.com/wardonne/pck/cmd"
+go install "github.com/wardonne/destiny-child-pck-tool/cmd/pcktool"
 
 # unpack pck file(s)
-pck -s <source directory or file> -t <output directory>
+pcktool -s <source directory or file> -t <output directory>
 
 # unpack pck file(s) as live2d
-pck -s <source directory or file> -t <output directory> -l
+pcktool -s <source directory or file> -t <output directory> -l
 
 # for more information
-pck -h
+pcktool -h
 ```

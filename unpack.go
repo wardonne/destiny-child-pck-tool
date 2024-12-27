@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/gopi-frame/contract/console"
+	"github.com/wardonne/distiny-child-pck-tool/crypt"
+	"github.com/wardonne/distiny-child-pck-tool/object"
+	"github.com/wardonne/distiny-child-pck-tool/yappy"
 	"io"
 	"os"
-	"pcktool/crypt"
-	"pcktool/object"
-	"pcktool/yappy"
 	"strings"
 )
 

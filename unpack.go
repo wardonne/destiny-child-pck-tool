@@ -2,63 +2,97 @@ package pcktool
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
-	"github.com/gopi-frame/contract/console"
 	"github.com/wardonne/destiny-child-pck-tool/crypt"
 	"github.com/wardonne/destiny-child-pck-tool/object"
 	"github.com/wardonne/destiny-child-pck-tool/yappy"
 	"io"
 	"os"
-	"strings"
 )
 
-func Unpack(path string, output console.Output) (*object.Package, error) {
+func Unpack(path string) (*object.Package, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	buf := bytes.NewReader(content)
-	head, err := ReadN(buf, 8)
-	fileCount, err := ReadInt(buf)
+	pkg, err := UnpackStream(buf)
 	if err != nil {
 		return nil, err
 	}
-	pck := object.NewPackage(path, head, fileCount)
-	output.Infof("Found %d files | %s", fileCount, strings.ToUpper(hex.EncodeToString(head)))
+	pkg.Path = path
+	return pkg, nil
+}
+
+func UnpackStream(stream io.ReadSeeker) (*object.Package, error) {
+	head, err := getHead(stream)
+	if err != nil {
+		return nil, err
+	}
+	fileCount, err := getFileCount(stream)
+	if err != nil {
+		return nil, err
+	}
+	pck := object.NewPackage("", head, fileCount)
+	entries, err := getFiles(stream, fileCount)
+	if err != nil {
+		return nil, err
+	}
+	pck.Entries = entries
+	return pck, nil
+}
+
+func getHead(stream io.Reader) ([]byte, error) {
+	head, err := ReadN(stream, 8)
+	if err != nil {
+		return nil, err
+	}
+	return head, nil
+}
+
+func getFileCount(stream io.Reader) (int, error) {
+	fileCount, err := ReadInt(stream)
+	if err != nil {
+		return 0, err
+	}
+	return fileCount, nil
+}
+
+func getFiles(stream io.ReadSeeker, fileCount int) ([]*object.PackageEntry, error) {
+	var entries []*object.PackageEntry
 	for i := 0; i < fileCount; i++ {
-		hash, err := ReadN(buf, 8)
+		hash, err := ReadN(stream, 8)
 		if err != nil {
 			return nil, err
 		}
-		flag, err := ReadByte(buf)
+		flag, err := ReadByte(stream)
 		if err != nil {
 			return nil, err
 		}
-		offset, err := ReadInt(buf)
+		offset, err := ReadInt(stream)
 		if err != nil {
 			return nil, err
 		}
-		size, err := ReadInt(buf)
+		size, err := ReadInt(stream)
 		if err != nil {
 			return nil, err
 		}
-		originalSize, err := ReadInt(buf)
+		originalSize, err := ReadInt(stream)
 		if err != nil {
 			return nil, err
 		}
-		less, err := ReadInt(buf)
+		_, err = ReadInt(stream)
 		if err != nil {
 			return nil, err
 		}
-		start, err := buf.Seek(0, io.SeekCurrent)
+		start, err := stream.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := buf.Seek(int64(offset), io.SeekStart); err != nil {
+		if _, err := stream.Seek(int64(offset), io.SeekStart); err != nil {
 			return nil, err
 		}
-		data, err := ReadN(buf, size)
+		data, err := ReadN(stream, size)
 		if err != nil {
 			return nil, err
 		}
@@ -89,12 +123,13 @@ func Unpack(path string, output console.Output) (*object.Package, error) {
 			extStr = "unk"
 		}
 		entry := object.NewPackageEntry(hash, data, extStr, fmt.Sprintf("%08d.%s", i, extStr))
-		output.Infof("File %02d/%d: [%016X | %6d bytes or %6d] %s %02d %d",
-			i+1, fileCount, offset, originalSize, size, strings.ToUpper(hex.EncodeToString(hash)), flag, less)
-		pck.Entries = append(pck.Entries, entry)
-		if _, err := buf.Seek(start, io.SeekStart); err != nil {
+		if _, err := stream.Seek(start, io.SeekStart); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+		if _, err := stream.Seek(start, io.SeekStart); err != nil {
 			return nil, err
 		}
 	}
-	return pck, nil
+	return entries, nil
 }

@@ -1,13 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gopi-frame/collection/list"
 	"github.com/gopi-frame/console"
+	. "github.com/gopi-frame/contract/console"
 	"github.com/spf13/cobra"
 	"github.com/wardonne/destiny-child-pck-tool"
+	"github.com/wardonne/destiny-child-pck-tool/crypt"
+	"github.com/wardonne/destiny-child-pck-tool/object"
+	"github.com/wardonne/destiny-child-pck-tool/yappy"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -128,7 +135,7 @@ func main() {
 					<-ch
 				}()
 				output.Debugf("Unpacking %s", file)
-				pack, err := pcktool.Unpack(file, output)
+				pack, err := unpack(file, output)
 				if err != nil {
 					panic(fmt.Sprintf("Failed to unpack %s: %v", file, err))
 					return
@@ -197,4 +204,90 @@ func main() {
 		output.Successf("Unpacked %d files in %s [ %02d succeed | %02d skipped ]", len(files), time.Since(start), success.Count(), skipped.Count())
 	}
 	_ = kernel.Run()
+}
+
+func unpack(path string, output Output) (*object.Package, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewReader(content)
+	head, err := pcktool.ReadN(buf, 8)
+	fileCount, err := pcktool.ReadInt(buf)
+	if err != nil {
+		return nil, err
+	}
+	pck := object.NewPackage(path, head, fileCount)
+	output.Infof("Found %d files | %s", fileCount, strings.ToUpper(hex.EncodeToString(head)))
+	for i := 0; i < fileCount; i++ {
+		hash, err := pcktool.ReadN(buf, 8)
+		if err != nil {
+			return nil, err
+		}
+		flag, err := pcktool.ReadByte(buf)
+		if err != nil {
+			return nil, err
+		}
+		offset, err := pcktool.ReadInt(buf)
+		if err != nil {
+			return nil, err
+		}
+		size, err := pcktool.ReadInt(buf)
+		if err != nil {
+			return nil, err
+		}
+		originalSize, err := pcktool.ReadInt(buf)
+		if err != nil {
+			return nil, err
+		}
+		less, err := pcktool.ReadInt(buf)
+		if err != nil {
+			return nil, err
+		}
+		start, err := buf.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := buf.Seek(int64(offset), io.SeekStart); err != nil {
+			return nil, err
+		}
+		data, err := pcktool.ReadN(buf, size)
+		if err != nil {
+			return nil, err
+		}
+		if flag&2 == 2 {
+			data, err = crypt.Decrypt(data)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if flag&1 == 1 {
+			data, err = yappy.Decompress(data, originalSize)
+			if err != nil {
+				return nil, err
+			}
+		}
+		var ext byte
+		if len(data) > 0 {
+			ext = data[0] & 0xFF
+		}
+		var extMap = map[byte]string{
+			109: "dat",
+			35:  "mtn",
+			137: "png",
+			123: "json",
+		}
+		extStr, ok := extMap[ext]
+		if !ok {
+			extStr = "unk"
+		}
+		entry := object.NewPackageEntry(hash, data, extStr, fmt.Sprintf("%08d.%s", i, extStr))
+		output.Infof("File %02d/%d: [%016X | %6d bytes or %6d] %s %02d %d",
+			i+1, fileCount, offset, originalSize, size, strings.ToUpper(hex.EncodeToString(hash)), flag, less)
+		pck.Entries = append(pck.Entries, entry)
+		if _, err := buf.Seek(start, io.SeekStart); err != nil {
+			return nil, err
+		}
+	}
+	return pck, nil
 }
